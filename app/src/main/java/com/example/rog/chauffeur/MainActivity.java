@@ -1,14 +1,19 @@
 package com.example.rog.chauffeur;
 
 import android.Manifest;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.ListView;
 
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.mapbox.mapboxsdk.MapboxAccountManager;
@@ -31,14 +36,13 @@ public class MainActivity extends AppCompatActivity {
     private MapView mapView;
     private MapboxMap map;
     private FloatingActionButton floatingActionButton;
+    private FloatingActionButton floatingActionButton2;
     private LocationServices locationServices;
-
-
+    private ListView listView;
+    private ArrayAdapter<String> adapter;
     private static final int PERMISSIONS_LOCATION = 0;
-    /**
-     * ATTENTION: This was auto-generated to implement the App Indexing API.
-     * See https://g.co/AppIndexing/AndroidStudio for more information.
-     */
+    private DBManager dbManager;
+
     private GoogleApiClient client;
 
     @Override
@@ -49,6 +53,13 @@ public class MainActivity extends AppCompatActivity {
         locationServices = LocationServices.getLocationServices(MainActivity.this);
 
         mapView = (MapView) findViewById(R.id.mapview);
+        listView = (ListView) findViewById(R.id.listView);
+        adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1);
+        listView.setAdapter(adapter);
+        LoadPreferences();
+
+    
+
 
         mapView.onCreate(savedInstanceState);
         mapView.getMapAsync(new OnMapReadyCallback() {
@@ -58,12 +69,23 @@ public class MainActivity extends AppCompatActivity {
                 map.setOnMapLongClickListener(new  MapboxMap.OnMapLongClickListener() {
                     @Override
                     public void onMapLongClick(LatLng point) {
-
-                        updateMap(point.getLatitude(), point.getLongitude());
+                        String string = point.toString();
+                        updateMap(point.getLatitude(), point.getLongitude(), string);
                     }
                 }); }
         });
 
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener()
+        {
+            @Override
+            public void onItemClick(AdapterView<?> adapter, View v, int position,
+                                    long arg3)
+            {
+                String value = (String)adapter.getItemAtPosition(position);
+
+
+        }
+        });
 
         floatingActionButton = (FloatingActionButton) findViewById(R.id.location_toggle_fab);
         floatingActionButton.setOnClickListener(new View.OnClickListener() {
@@ -74,6 +96,18 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+        floatingActionButton2 = (FloatingActionButton) findViewById(R.id.location_toggle_fab2);
+        floatingActionButton2.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (listView.getVisibility() == ListView.VISIBLE) {
+                    listView.setVisibility(ListView.INVISIBLE);
+                }
+                else {
+                    listView.setVisibility(ListView.VISIBLE);
+                }
+            }
+        });
         GeocoderAutoCompleteView autocomplete = (GeocoderAutoCompleteView) findViewById(R.id.query);
         autocomplete.setAccessToken(MapboxAccountManager.getInstance().getAccessToken());
         autocomplete.setType(GeocodingCriteria.TYPE_POI);
@@ -81,25 +115,56 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void OnFeatureClick(CarmenFeature feature) {
                 Position position = feature.asPosition();
-                updateMap(position.getLatitude(), position.getLongitude());
+                String string = feature.toString();
+
+                adapter.add(string);
+                adapter.notifyDataSetChanged();
+                SavePreferences("LISTS", string);
+                updateMap(position.getLatitude(), position.getLongitude(),string);
             }
         });
 
     }
 
-    private void updateMap(double latitude, double longitude) {
+    private void updateMap(double latitude, double longitude, String string) {
         // Build marker
         map.removeAnnotations() ;
         map.addMarker(new MarkerOptions()
                 .position(new LatLng(latitude, longitude))
-                .title("Résultat géocodeur"));
+                .title(string));
 
-        // Animate camera to geocoder result location
         CameraPosition cameraPosition = new CameraPosition.Builder()
                 .target(new LatLng(latitude, longitude))
                 .zoom(15)
                 .build();
         map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 5000, null);
+    }
+    protected void SavePreferences(String key, String value) {
+        // TODO Auto-generated method stub
+        SharedPreferences data = PreferenceManager.getDefaultSharedPreferences(this);
+
+        String s=data.getString(key,"");
+
+        s=s+"!"+value;
+
+        data.edit().putString(key,s).commit();
+
+
+    }
+    protected void LoadPreferences(){
+        SharedPreferences data = PreferenceManager.getDefaultSharedPreferences(this);
+        String dataSet = data.getString("LISTS", "");
+        if(dataSet.contains("!")){
+
+            String rows[]=dataSet.split("!");
+            for(int i=0;i<15;i++){
+                adapter.add(rows[i]);
+                adapter.notifyDataSetChanged();
+            }
+        } else{
+            adapter.add(dataSet);
+            adapter.notifyDataSetChanged();
+        }
     }
 
     @Override
@@ -134,7 +199,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void toggleGps(boolean enableGps) {
         if (enableGps) {
-            // Check if user has granted location permission
+
             if (!locationServices.areLocationPermissionsGranted()) {
                 ActivityCompat.requestPermissions(this, new String[]{
                         Manifest.permission.ACCESS_COARSE_LOCATION,
@@ -149,7 +214,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void enableLocation(boolean enabled) {
         if (enabled) {
-            // If we have the last location of the user, we can move the camera to that position.
+
             Location lastLocation = locationServices.getLastLocation();
             if (lastLocation != null) {
                 map.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(lastLocation), 16));
@@ -159,10 +224,7 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void onLocationChanged(Location location) {
                     if (location != null) {
-                        // Move the map camera to where the user location is and then remove the
-                        // listener so the camera isn't constantly updating when the user location
-                        // changes. When the user disables and then enables the location again, this
-                        // listener is registered again and will adjust the camera once again.
+
                         map.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(location), 16));
                         locationServices.removeLocationListener(this);
                     }
@@ -172,7 +234,7 @@ public class MainActivity extends AppCompatActivity {
         } else {
             floatingActionButton.setImageResource(R.drawable.ic_my_location_24dp);
         }
-        // Enable or disable the location layer on the map
+
         map.setMyLocationEnabled(enabled);
     }
 

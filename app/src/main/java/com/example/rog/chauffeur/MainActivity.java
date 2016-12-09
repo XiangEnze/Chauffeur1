@@ -49,13 +49,22 @@ public class MainActivity extends AppCompatActivity {
         locationServices = LocationServices.getLocationServices(MainActivity.this);
 
         mapView = (MapView) findViewById(R.id.mapview);
+
         mapView.onCreate(savedInstanceState);
         mapView.getMapAsync(new OnMapReadyCallback() {
             @Override
             public void onMapReady(MapboxMap mapboxMap) {
                 map = mapboxMap;
-            }
+                map.setOnMapLongClickListener(new  MapboxMap.OnMapLongClickListener() {
+                    @Override
+                    public void onMapLongClick(LatLng point) {
+
+                        updateMap(point.getLatitude(), point.getLongitude());
+                    }
+                }); }
         });
+
+
         floatingActionButton = (FloatingActionButton) findViewById(R.id.location_toggle_fab);
         floatingActionButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -76,12 +85,11 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-
-
     }
 
     private void updateMap(double latitude, double longitude) {
         // Build marker
+        map.removeAnnotations() ;
         map.addMarker(new MarkerOptions()
                 .position(new LatLng(latitude, longitude))
                 .title("Résultat géocodeur"));
@@ -178,6 +186,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
- 
+
 
 }
